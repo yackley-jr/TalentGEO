@@ -574,9 +574,9 @@ Reference specific signal failures in D3 findings. perUrlScores must reflect the
 
 
     ? `GSC DATA AVAILABLE: Real Google Search Console data has been pulled for ${gscData.siteUrl}.
-- Job pages found in GSC: ${gscData.jobPageSearchAnalytics?.rowCount ?? 0}
-- Total impressions (90 days): ${gscData.jobPageSearchAnalytics?.totalImpressions ?? 0}
-- Total clicks (90 days): ${gscData.jobPageSearchAnalytics?.totalClicks ?? 0}
+- Job pages found in GSC: ${(gscData.jobPageSearchAnalytics && gscData.jobPageSearchAnalytics.rowCount) || 0}
+- Total impressions (90 days): ${(gscData.jobPageSearchAnalytics && gscData.jobPageSearchAnalytics.totalImpressions) || 0}
+- Total clicks (90 days): ${(gscData.jobPageSearchAnalytics && gscData.jobPageSearchAnalytics.totalClicks) || 0}
 Use this data to give precise, accurate D1 and D2 scores. Reference specific impression/click numbers in findings.`
     : `GSC DATA: Not connected. Score D1 and D2 based on schema and robots.txt/sitemap data only. Note in findings that connecting GSC would provide deeper insights.`;
 
