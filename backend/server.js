@@ -5,14 +5,160 @@ const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-app.use(cors());
+// The backend's own public URL — used to build the redirect URI
+const BACKEND_URL = process.env.BACKEND_URL || 'https://talentgeo-backend-360027703478.us-central1.run.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://talentgeo-frontend-360027703478.us-central1.run.app';
+
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
 
-// Health check
+// ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
+
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'Talent GEO Audit API v2' });
+  res.json({ status: 'ok', service: 'Talent GEO Audit API v3' });
 });
+
+// ─── OAUTH: STEP 1 — REDIRECT USER TO GOOGLE ─────────────────────────────────
+
+app.get('/auth/google', (req, res) => {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `${BACKEND_URL}/auth/callback`,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+    access_type: 'online',
+    prompt: 'select_account'
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// ─── OAUTH: STEP 2 — HANDLE GOOGLE CALLBACK ──────────────────────────────────
+
+app.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error || !code) {
+    return res.redirect(`${FRONTEND_URL}?gsc=error&reason=${error || 'no_code'}`);
+  }
+
+  try {
+    // Exchange auth code for access token
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${BACKEND_URL}/auth/callback`,
+        grant_type: 'authorization_code'
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (!tokenData.access_token) {
+      console.error('Token exchange failed:', tokenData);
+      return res.redirect(`${FRONTEND_URL}?gsc=error&reason=token_exchange_failed`);
+    }
+
+    // Pass the token back to the frontend via URL param
+    // Token is short-lived (1hr) and used only for the audit — not stored
+    res.redirect(`${FRONTEND_URL}?gsc=connected&token=${encodeURIComponent(tokenData.access_token)}`);
+
+  } catch (err) {
+    console.error('OAuth callback error:', err);
+    res.redirect(`${FRONTEND_URL}?gsc=error&reason=server_error`);
+  }
+});
+
+// ─── GSC DATA FETCHERS ────────────────────────────────────────────────────────
+
+async function fetchGSCSites(accessToken) {
+  try {
+    const res = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!res.ok) return { success: false, status: res.status };
+    const data = await res.json();
+    return { success: true, sites: data.siteEntry || [] };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+async function fetchGSCSearchAnalytics(accessToken, siteUrl, domain) {
+  try {
+    // Last 90 days
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const res = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['page'],
+          dimensionFilterGroups: [{
+            filters: [{
+              dimension: 'page',
+              operator: 'containsWord',
+              expression: 'job'
+            }]
+          }],
+          rowLimit: 25
+        })
+      }
+    );
+    if (!res.ok) return { success: false, status: res.status };
+    const data = await res.json();
+    return { success: true, rows: data.rows || [], totals: data.responseAggregationType };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+async function fetchGSCIndexCoverage(accessToken, siteUrl) {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/urlInspection/index:inspect`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inspectionUrl: siteUrl,
+          siteUrl
+        })
+      }
+    );
+    if (!res.ok) return { success: false, status: res.status };
+    const data = await res.json();
+    return { success: true, result: data.inspectionResult };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function matchSiteToDomain(sites, domain) {
+  // Try to find the GSC property that matches the audited domain
+  const domainClean = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return sites.find(s => {
+    const siteClean = s.siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^sc-domain:/, '');
+    return siteClean.includes(domainClean) || domainClean.includes(siteClean);
+  });
+}
 
 // ─── DATA FETCHING UTILITIES ──────────────────────────────────────────────────
 
@@ -66,13 +212,11 @@ function extractJSONLD(html) {
 function findJobPostingSchema(blocks) {
   for (const block of blocks) {
     if (!block || block.parseError) continue;
-    // Handle @graph arrays
     if (block['@graph']) {
       const job = block['@graph'].find(item => item['@type'] === 'JobPosting');
       if (job) return job;
     }
     if (block['@type'] === 'JobPosting') return block;
-    // Handle arrays
     if (Array.isArray(block)) {
       const job = block.find(item => item && item['@type'] === 'JobPosting');
       if (job) return job;
@@ -101,7 +245,6 @@ function auditJobPostingSchema(schema) {
     if (!schema[f]) gaps.push({ field: f, priority: 'recommended', impact: 'medium' });
   });
 
-  // Score: required fields worth 10pts each (50 total), recommended 6.25pts each (50 total)
   const requiredScore = required.filter(f => schema[f]).length * 10;
   const recommendedScore = recommended.filter(f => schema[f]).length * 6.25;
   const score = Math.round(requiredScore + recommendedScore);
@@ -114,8 +257,6 @@ function auditRobotsTxt(text, domain) {
 
   const issues = [];
   const lines = text.toLowerCase().split('\n');
-
-  // Check for broad Disallow rules that might block job pages
   let currentAgent = null;
   let blocksAll = false;
   let blocksJobs = false;
@@ -155,42 +296,31 @@ function auditSitemap(text) {
   const urlCount = (text.match(/<url>/gi) || []).length;
   const hasJobUrls = text.includes('/jobs') || text.includes('/careers') || text.includes('/job/') || text.includes('/position');
   const hasLastmod = text.includes('<lastmod>');
-  const hasPriority = text.includes('<priority>');
 
   if (!hasJobUrls) issues.push('Sitemap does not appear to include job posting URLs');
   if (!hasLastmod) issues.push('No <lastmod> dates in sitemap — search engines cannot determine content freshness');
   if (urlCount === 0) issues.push('Sitemap appears empty or malformed');
 
-  return {
-    found: true,
-    urlCount,
-    hasJobUrls,
-    hasLastmod,
-    hasPriority,
-    issues
-  };
+  return { found: true, urlCount, hasJobUrls, hasLastmod, issues };
 }
 
 function extractVisibleText(html) {
   if (!html) return '';
-  // Strip scripts, styles, and tags
   let text = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return text.substring(0, 3000); // First 3000 chars is enough for content analysis
+  return text.substring(0, 3000);
 }
-
-// ─── NORMALIZE DOMAIN ─────────────────────────────────────────────────────────
 
 function normalizeDomain(domain) {
   let d = domain.trim();
   if (!d.startsWith('http')) d = 'https://' + d;
   try {
     const url = new URL(d);
-    return url.origin; // e.g. https://careers.acme.com
+    return url.origin;
   } catch (e) {
     return 'https://' + domain.trim();
   }
@@ -203,7 +333,7 @@ app.post('/audit', async (req, res) => {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
-  const { domain, brand, industry, context, jobUrls } = req.body;
+  const { domain, brand, industry, context, jobUrls, gscToken } = req.body;
 
   if (!domain || !brand) {
     return res.status(400).json({ error: 'domain and brand are required' });
@@ -212,13 +342,68 @@ app.post('/audit', async (req, res) => {
   const baseUrl = normalizeDomain(domain);
   const urls = (jobUrls || []).filter(u => u && u.trim().length > 0);
 
-  // ── PARALLEL DATA COLLECTION ─────────────────────────────────────────────
+  // ── PARALLEL DATA COLLECTION ──────────────────────────────────────────────
 
   const [robotsResult, sitemapResult, ...jobPageResults] = await Promise.all([
     fetchText(`${baseUrl}/robots.txt`),
     fetchText(`${baseUrl}/sitemap.xml`),
     ...urls.map(u => fetchHTML(u.trim()))
   ]);
+
+  // ── GSC DATA COLLECTION (if token provided) ───────────────────────────────
+
+  let gscData = { connected: false };
+
+  if (gscToken) {
+    try {
+      const sitesResult = await fetchGSCSites(gscToken);
+
+      if (sitesResult.success && sitesResult.sites.length > 0) {
+        const matchedSite = matchSiteToDomain(sitesResult.sites, baseUrl);
+
+        if (matchedSite) {
+          const [analyticsResult, coverageResult] = await Promise.all([
+            fetchGSCSearchAnalytics(gscToken, matchedSite.siteUrl, baseUrl),
+            fetchGSCIndexCoverage(gscToken, matchedSite.siteUrl)
+          ]);
+
+          gscData = {
+            connected: true,
+            siteUrl: matchedSite.siteUrl,
+            permissionLevel: matchedSite.permissionLevel,
+            jobPageSearchAnalytics: analyticsResult.success ? {
+              rowCount: analyticsResult.rows.length,
+              topPages: analyticsResult.rows.slice(0, 10).map(r => ({
+                page: r.keys[0],
+                clicks: r.clicks,
+                impressions: r.impressions,
+                ctr: (r.ctr * 100).toFixed(2) + '%',
+                position: r.position.toFixed(1)
+              })),
+              totalClicks: analyticsResult.rows.reduce((sum, r) => sum + r.clicks, 0),
+              totalImpressions: analyticsResult.rows.reduce((sum, r) => sum + r.impressions, 0)
+            } : { error: 'Analytics unavailable', status: analyticsResult.status },
+            indexCoverage: coverageResult.success ? coverageResult.result : { error: 'Coverage data unavailable' }
+          };
+        } else {
+          gscData = {
+            connected: true,
+            matchedSite: false,
+            availableSites: sitesResult.sites.map(s => s.siteUrl),
+            note: `GSC account has ${sitesResult.sites.length} properties but none matched ${baseUrl}`
+          };
+        }
+      } else {
+        gscData = {
+          connected: true,
+          matchedSite: false,
+          note: sitesResult.success ? 'No GSC properties found in this account' : `GSC API error: ${sitesResult.status}`
+        };
+      }
+    } catch (e) {
+      gscData = { connected: true, error: e.message };
+    }
+  }
 
   // ── PARSE COLLECTED DATA ──────────────────────────────────────────────────
 
@@ -227,20 +412,12 @@ app.post('/audit', async (req, res) => {
 
   const jobAudits = jobPageResults.map((result, i) => {
     if (!result.success) {
-      return {
-        url: urls[i],
-        fetchSuccess: false,
-        error: result.error || `HTTP ${result.status}`,
-        schema: null,
-        schemaAudit: null,
-        contentPreview: null
-      };
+      return { url: urls[i], fetchSuccess: false, error: result.error || `HTTP ${result.status}`, schema: null, schemaAudit: null, contentPreview: null };
     }
     const jsonldBlocks = extractJSONLD(result.html);
     const jobSchema = findJobPostingSchema(jsonldBlocks);
     const schemaAudit = auditJobPostingSchema(jobSchema);
     const contentPreview = extractVisibleText(result.html);
-
     return {
       url: urls[i],
       fetchSuccess: true,
@@ -248,29 +425,36 @@ app.post('/audit', async (req, res) => {
       hasJobPostingSchema: !!jobSchema,
       schemaAudit,
       contentPreview,
-      allSchemaTypes: jsonldBlocks
-        .filter(b => !b.parseError)
-        .map(b => b['@type'] || (b['@graph'] ? '@graph' : 'unknown'))
+      allSchemaTypes: jsonldBlocks.filter(b => !b.parseError).map(b => b['@type'] || (b['@graph'] ? '@graph' : 'unknown'))
     };
   });
-
-  // ── BUILD DATA SUMMARY FOR CLAUDE ────────────────────────────────────────
 
   const realDataSummary = {
     domain: baseUrl,
     robotsTxt: robotsAudit,
     sitemap: sitemapAudit,
     jobPages: jobAudits,
-    urlsProvided: urls.length
+    urlsProvided: urls.length,
+    gsc: gscData
   };
 
-  // ── CLAUDE PROMPT WITH REAL DATA ─────────────────────────────────────────
+  // ── CLAUDE PROMPT ─────────────────────────────────────────────────────────
+
+  const gscContext = gscData.connected && gscData.siteUrl
+    ? `GSC DATA AVAILABLE: Real Google Search Console data has been pulled for ${gscData.siteUrl}.
+- Job pages found in GSC: ${gscData.jobPageSearchAnalytics?.rowCount ?? 0}
+- Total impressions (90 days): ${gscData.jobPageSearchAnalytics?.totalImpressions ?? 0}
+- Total clicks (90 days): ${gscData.jobPageSearchAnalytics?.totalClicks ?? 0}
+Use this data to give precise, accurate D1 and D2 scores. Reference specific impression/click numbers in findings.`
+    : `GSC DATA: Not connected. Score D1 and D2 based on schema and robots.txt/sitemap data only. Note in findings that connecting GSC would provide deeper insights.`;
 
   const systemPrompt = `You are the Cassillon AI GEO Audit Engine. You apply the Cassillon AI GEO Optimization Protocol — a five-dimension framework for auditing employer brand and job posting visibility in AI-mediated candidate search.
 
-You will receive REAL audit data collected from the client's actual career site and job posting URLs. Your job is to interpret this real data, identify genuine gaps, and produce an accurate, specific GEO readiness report.
+You will receive REAL audit data collected from the client's actual career site, job posting URLs, and optionally Google Search Console.
 
 Do not invent findings. Base every score and finding on the real data provided.
+
+${gscContext}
 
 Return ONLY valid JSON, no markdown, no preamble. Structure:
 {
@@ -301,16 +485,16 @@ Return ONLY valid JSON, no markdown, no preamble. Structure:
       "name": "Schema Integrity",
       "score": 0-100,
       "colorClass": "blue",
-      "findings": ["specific finding based on real schema data", "specific finding 2", "specific finding 3"],
-      "dataSource": "real"
+      "findings": ["specific finding referencing real schema and GSC data", "finding 2", "finding 3"],
+      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : 'real'}"
     },
     {
       "id": "D2",
       "name": "Career Site Hygiene",
       "score": 0-100,
       "colorClass": "teal",
-      "findings": ["specific finding based on real robots.txt/sitemap data", "finding 2", "finding 3"],
-      "dataSource": "real"
+      "findings": ["specific finding referencing real robots.txt/sitemap and GSC coverage data", "finding 2", "finding 3"],
+      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : 'real'}"
     },
     {
       "id": "D3",
@@ -345,17 +529,6 @@ Return ONLY valid JSON, no markdown, no preamble. Structure:
   ]
 }
 
-Scoring guidance for D1 (Schema Integrity) based on real data:
-- JobPosting schema present with all 5 required fields + 4+ recommended: 80-100
-- Schema present with all required fields, few recommended: 55-75
-- Schema present but missing required fields: 25-50
-- No JobPosting schema found: 5-20
-
-Scoring guidance for D2 (Career Site Hygiene) based on real data:
-- robots.txt clean, sitemap found with job URLs and lastmod: 75-100
-- Minor issues in robots.txt or sitemap: 45-70
-- Significant crawl blocking or sitemap missing: 10-40
-
 Provide exactly 5 internalActions and exactly 4 cassillonActions.
 Make all findings and actions specific to the real data — not generic.`;
 
@@ -366,11 +539,8 @@ Domain: ${baseUrl}
 Industry: ${industry || 'Not specified'}
 Additional context: ${context || 'None'}
 
-REAL AUDIT DATA COLLECTED:
-
-${JSON.stringify(realDataSummary, null, 2)}
-
-Based on this real data, produce the GEO audit report. For D1 and D2, your findings must reference specific things found (or not found) in the actual data above. For D3, analyze the contentPreview from the job pages if available. For D4 and D5, use your knowledge of the brand combined with the signals you can infer from the technical data.`;
+REAL AUDIT DATA:
+${JSON.stringify(realDataSummary, null, 2)}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -395,15 +565,10 @@ Based on this real data, produce the GEO audit report. For D1 and D2, your findi
     }
 
     const data = await response.json();
-    const text = data.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
+    const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
     const clean = text.replace(/```json|```/g, '').trim();
     const report = JSON.parse(clean);
 
-    // Attach raw audit data for transparency
     res.json({ success: true, report, auditData: realDataSummary });
 
   } catch (err) {
@@ -413,5 +578,5 @@ Based on this real data, produce the GEO audit report. For D1 and D2, your findi
 });
 
 app.listen(PORT, () => {
-  console.log(`Talent GEO backend v2 running on port ${PORT}`);
+  console.log(`Talent GEO backend v3 running on port ${PORT}`);
 });
