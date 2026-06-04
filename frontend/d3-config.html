@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D3 Scoring Config — Talent GEO Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f0e0c;
+    --ink2: #3a3832;
+    --ink3: #7a7670;
+    --surface: #faf9f6;
+    --surface2: #f0ede6;
+    --surface3: #e4e0d8;
+    --gold: #b8860b;
+    --gold-lt: #f5e9c8;
+    --gold-dk: #8a6408;
+    --teal: #0f6e56;
+    --teal-lt: #e1f5ee;
+    --red: #a32d2d;
+    --red-lt: #fcebeb;
+    --amber: #ba7517;
+    --amber-lt: #faeeda;
+    --blue: #185fa5;
+    --blue-lt: #e6f1fb;
+    --green-lt: #eaf3de;
+    --green: #3b6d11;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--surface);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--surface3);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .logo-mark {
+    width: 30px; height: 30px;
+    background: var(--ink); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold);
+    font-family: 'Instrument Serif', serif;
+    font-size: 17px;
+  }
+  .logo-text { font-size: 14px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink); }
+  .logo-sub { font-size: 11px; color: var(--ink3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: -2px; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .admin-badge {
+    background: var(--ink); color: var(--gold);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.05em; padding: 4px 10px;
+    border-radius: 20px; text-transform: uppercase;
+  }
+  .nav-back {
+    font-size: 13px; color: var(--ink3); text-decoration: none;
+    display: flex; align-items: center; gap: 4px;
+    transition: color 0.15s;
+  }
+  .nav-back:hover { color: var(--ink); }
+
+  /* LOCK SCREEN */
+  #lock-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(100vh - 56px);
+  }
+  .lock-card {
+    background: #fff;
+    border: 1px solid var(--surface3);
+    border-radius: var(--radius-lg);
+    padding: 48px 44px;
+    width: 100%; max-width: 400px;
+    text-align: center;
+  }
+  .lock-icon {
+    width: 52px; height: 52px;
+    background: var(--surface2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 22px;
+  }
+  .lock-card h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px; font-weight: 400;
+    margin-bottom: 6px;
+  }
+  .lock-card p {
+    font-size: 13px; color: var(--ink3);
+    margin-bottom: 28px;
+  }
+  .lock-input-wrap { position: relative; margin-bottom: 14px; }
+  .lock-input-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--surface3);
+    border-radius: 8px;
+    padding: 12px 44px 12px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; color: var(--ink);
+    outline: none; transition: border-color 0.15s;
+    letter-spacing: 0.1em;
+  }
+  .lock-input-wrap input:focus { border-color: var(--gold); background: #fff; }
+  .lock-input-wrap input.error { border-color: var(--red); background: var(--red-lt); }
+  .toggle-pw {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--ink3); font-size: 16px; padding: 0;
+    transition: color 0.15s;
+  }
+  .toggle-pw:hover { color: var(--ink); }
+  .lock-error {
+    font-size: 12px; color: var(--red);
+    margin-bottom: 12px; display: none;
+  }
+  .btn-unlock {
+    width: 100%; background: var(--ink); color: #fff;
+    border: none; border-radius: 8px; padding: 13px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-unlock:hover { opacity: 0.85; }
+
+  /* MAIN */
+  #main-screen { display: none; }
+  .page-wrap { max-width: 780px; margin: 0 auto; padding: 48px 2rem 80px; }
+
+  .page-header { margin-bottom: 36px; }
+  .page-eyebrow {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600; margin-bottom: 10px;
+  }
+  .page-header h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 38px; font-weight: 400; line-height: 1.1;
+    letter-spacing: -0.5px; margin-bottom: 10px;
+  }
+  .page-header h1 em { font-style: italic; color: var(--gold-dk); }
+  .page-header p { font-size: 14px; color: var(--ink3); max-width: 520px; line-height: 1.7; }
+
+  /* TOTAL BAR */
+  .total-bar {
+    background: #fff;
+    border: 1px solid var(--surface3);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px;
+    position: sticky; top: 64px; z-index: 10;
+  }
+  .total-bar-left { display: flex; align-items: center; gap: 12px; }
+  .total-label { font-size: 13px; color: var(--ink3); }
+  .total-number { font-family: 'Instrument Serif', serif; font-size: 32px; line-height: 1; }
+  .total-number.valid { color: var(--teal); }
+  .total-number.invalid { color: var(--red); }
+  .total-status {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 4px 12px; border-radius: 20px;
+  }
+  .total-status.valid { background: var(--teal-lt); color: var(--teal); }
+  .total-status.invalid { background: var(--red-lt); color: var(--red); }
+  .total-bar-right { font-size: 12px; color: var(--ink3); }
+
+  /* SECTION CARD */
+  .section-card {
+    background: #fff;
+    border: 1px solid var(--surface3);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+  }
+  .section-card h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px; font-weight: 400; margin-bottom: 4px;
+  }
+  .section-sub { font-size: 13px; color: var(--ink3); margin-bottom: 24px; }
+  .section-divider { height: 1px; background: var(--surface2); margin: 4px 0 0; }
+
+  /* WEIGHT ROW */
+  .weight-row {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--surface2);
+  }
+  .weight-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .weight-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; margin-bottom: 10px;
+    gap: 16px;
+  }
+  .weight-meta { flex: 1; }
+  .weight-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .weight-desc { font-size: 12px; color: var(--ink3); }
+  .weight-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .weight-val {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px; line-height: 1;
+    min-width: 36px; text-align: right;
+  }
+  .weight-pct {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+    padding: 3px 9px; border-radius: 12px;
+    min-width: 46px; text-align: center;
+  }
+  .slider-wrap { position: relative; }
+  input[type="range"] {
+    width: 100%; height: 4px;
+    -webkit-appearance: none; appearance: none;
+    background: var(--surface3); border-radius: 2px; cursor: pointer;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ink); cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ink); cursor: pointer;
+    border: 2px solid #fff;
+  }
+  .slider-track-fill {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    height: 4px; border-radius: 2px;
+    pointer-events: none; left: 0;
+    transition: width 0.05s;
+  }
+
+  /* THRESHOLDS */
+  .threshold-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .threshold-item label {
+    display: block; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--ink2); margin-bottom: 10px;
+  }
+  .threshold-val-row {
+    display: flex; align-items: baseline; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .threshold-val {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px; line-height: 1; color: var(--ink);
+  }
+  .threshold-unit { font-size: 12px; color: var(--ink3); }
+
+  /* ACTIONS */
+  .actions-bar {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-top: 8px;
+  }
+  .btn-primary {
+    background: var(--ink); color: #fff;
+    border: none; border-radius: 8px; padding: 12px 22px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent; color: var(--ink);
+    border: 1.5px solid var(--surface3); border-radius: 8px;
+    padding: 11px 20px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-secondary:hover { border-color: var(--ink3); background: var(--surface2); }
+  .copy-confirm {
+    font-size: 12px; color: var(--teal);
+    opacity: 0; transition: opacity 0.3s;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* OUTPUT PANEL */
+  .output-panel {
+    background: var(--ink); border-radius: var(--radius-lg);
+    padding: 24px 28px; margin-top: 20px;
+    display: none;
+  }
+  .output-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .output-panel-header span {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--gold);
+  }
+  .btn-copy-small {
+    background: rgba(255,255,255,0.1); color: #fff;
+    border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+    padding: 5px 12px; font-family: 'DM Sans', sans-serif;
+    font-size: 12px; cursor: pointer; transition: background 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-copy-small:hover { background: rgba(255,255,255,0.18); }
+  .output-code {
+    font-family: 'Courier New', monospace; font-size: 12px;
+    color: rgba(255,255,255,0.85); line-height: 1.7;
+    white-space: pre; overflow-x: auto;
+  }
+
+  /* INSTRUCTIONS */
+  .instructions {
+    background: var(--gold-lt);
+    border: 1px solid #e8d08a;
+    border-radius: var(--radius);
+    padding: 16px 20px; margin-top: 20px;
+  }
+  .instructions h3 {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--gold-dk); margin-bottom: 10px;
+  }
+  .instructions ol {
+    padding-left: 18px; font-size: 13px;
+    color: var(--ink2); line-height: 1.8;
+  }
+  .instructions code {
+    background: rgba(184,134,11,0.12); padding: 1px 6px;
+    border-radius: 4px; font-size: 12px; color: var(--gold-dk);
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+  @media (max-width: 600px) {
+    .threshold-grid { grid-template-columns: 1fr; }
+    .total-bar { flex-wrap: wrap; gap: 10px; }
+    .page-header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="/">
+    <div class="logo-mark">C</div>
+    <div>
+      <div class="logo-text">Cassillon</div>
+      <div class="logo-sub">Talent GEO</div>
+    </div>
+  </a>
+  <div class="nav-right">
+    <a class="nav-back" href="/">← Back to audit</a>
+    <div class="admin-badge">Admin</div>
+  </div>
+</nav>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h2 class="serif">Admin access</h2>
+    <p>This page is restricted to Cassillon team members.</p>
+    <div class="lock-input-wrap">
+      <input type="password" id="pw-input" placeholder="Enter password"
+        onkeydown="if(event.key==='Enter') unlock()" />
+      <button class="toggle-pw" onclick="togglePW()" id="toggle-pw-btn" title="Show/hide password">👁</button>
+    </div>
+    <div class="lock-error" id="lock-error">Incorrect password. Try again.</div>
+    <button class="btn-unlock" onclick="unlock()">
+      <span>Unlock</span><span>→</span>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN SCREEN -->
+<div id="main-screen">
+  <div class="page-wrap fade-in">
+
+    <div class="page-header">
+      <div class="page-eyebrow">Cassillon Admin · D3 Scoring Protocol</div>
+      <h1>Job Posting Content <em>scoring</em></h1>
+      <p>Adjust signal weights and word count thresholds for the D3 dimension. Weights must sum to 100. Copy the config JSON and paste it into <code>server.js</code> to apply changes.</p>
+    </div>
+
+    <!-- TOTAL BAR -->
+    <div class="total-bar">
+      <div class="total-bar-left">
+        <div class="total-label">Weight total</div>
+        <div class="total-number valid" id="total-number">100</div>
+        <div class="total-status valid" id="total-status">Valid ✓</div>
+      </div>
+      <div class="total-bar-right" id="total-hint">All weights sum to 100 — ready to export</div>
+    </div>
+
+    <!-- WEIGHTS -->
+    <div class="section-card">
+      <h2>Signal weights</h2>
+      <div class="section-sub">Each signal contributes to the D3 score. Drag sliders to redistribute weight. Total must equal 100.</div>
+      <div id="weights-container"></div>
+    </div>
+
+    <!-- THRESHOLDS -->
+    <div class="section-card">
+      <h2>Word count thresholds</h2>
+      <div class="section-sub">Defines what counts as too short, ideal, or too long for a job description.</div>
+      <div class="threshold-grid">
+        <div class="threshold-item">
+          <label>Minimum words</label>
+          <div class="threshold-val-row">
+            <span class="threshold-val" id="thresh-min-val">150</span>
+            <span class="threshold-unit">words</span>
+          </div>
+          <input type="range" min="50" max="300" step="10" value="150" id="thresh-min"
+            oninput="updateThresh('min', this.value)">
+        </div>
+        <div class="threshold-item">
+          <label>Ideal words</label>
+          <div class="threshold-val-row">
+            <span class="threshold-val" id="thresh-ideal-val">400</span>
+            <span class="threshold-unit">words</span>
+          </div>
+          <input type="range" min="200" max="800" step="25" value="400" id="thresh-ideal"
+            oninput="updateThresh('ideal', this.value)">
+        </div>
+        <div class="threshold-item">
+          <label>Maximum words</label>
+          <div class="threshold-val-row">
+            <span class="threshold-val" id="thresh-max-val">900</span>
+            <span class="threshold-unit">words</span>
+          </div>
+          <input type="range" min="500" max="2000" step="50" value="900" id="thresh-max"
+            oninput="updateThresh('max', this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIONS + OUTPUT -->
+    <div class="actions-bar">
+      <button class="btn-primary" id="btn-export" onclick="exportConfig()">
+        Copy config JSON
+      </button>
+      <button class="btn-secondary" onclick="togglePreview()">
+        Preview JSON
+      </button>
+      <button class="btn-secondary" onclick="resetDefaults()">
+        Reset to defaults
+      </button>
+      <span class="copy-confirm" id="copy-confirm">✓ Copied to clipboard</span>
+    </div>
+
+    <div class="output-panel" id="output-panel">
+      <div class="output-panel-header">
+        <span>D3_CONFIG — paste into server.js</span>
+        <button class="btn-copy-small" onclick="copyFromPanel()">Copy ↗</button>
+      </div>
+      <div class="output-code" id="output-code"></div>
+    </div>
+
+    <div class="instructions">
+      <h3>How to apply this config</h3>
+      <ol>
+        <li>Click <strong>Copy config JSON</strong> above</li>
+        <li>Open <code>backend/server.js</code> in GitHub</li>
+        <li>Find the existing <code>D3_CONFIG</code> block and replace it with the copied JSON</li>
+        <li>Commit the change — Cloud Run will redeploy automatically</li>
+      </ol>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const PASSWORD = 'sC0r1ng!';
+  let previewOpen = false;
+
+  const DEFAULTS = [
+    { key: 'compensation',    label: 'Compensation transparency',       value: 30, description: 'Salary, pay range, or hourly rate present' },
+    { key: 'locationClarity', label: 'Location clarity',                value: 15, description: 'Location explicit, remote/hybrid/onsite stated' },
+    { key: 'employmentType',  label: 'Employment type',                 value: 10, description: 'Full-time, part-time, or contract specified' },
+    { key: 'wordCount',       label: 'Word count quality',              value: 10, description: 'Description length within ideal range' },
+    { key: 'answerFirst',     label: 'Answer-first structure',          value: 10, description: 'Role summary appears before requirements' },
+    { key: 'reqVsResp',       label: 'Requirements vs. responsibilities', value: 10, description: 'Clearly separated sections' },
+    { key: 'benefitsSignals', label: 'Benefits signals',                value:  8, description: 'Benefits, perks, or culture mentioned' },
+    { key: 'readability',     label: 'Readability',                     value:  7, description: 'Bullet structure, sentence length, low jargon' },
+  ];
+
+  const SIGNAL_COLORS = [
+    { bar: '#b8860b', bg: '#f5e9c8', text: '#8a6408' },
+    { bar: '#185fa5', bg: '#e6f1fb', text: '#0c447c' },
+    { bar: '#0f6e56', bg: '#e1f5ee', text: '#085041' },
+    { bar: '#533ab7', bg: '#eeedfe', text: '#26215c' },
+    { bar: '#533ab7', bg: '#eeedfe', text: '#26215c' },
+    { bar: '#0f6e56', bg: '#e1f5ee', text: '#085041' },
+    { bar: '#185fa5', bg: '#e6f1fb', text: '#0c447c' },
+    { bar: '#5f5e5a', bg: '#f1efe8', text: '#2c2c2a' },
+  ];
+
+  const DEFAULT_THRESHOLDS = { min: 150, ideal: 400, max: 900 };
+
+  let weights = DEFAULTS.map(w => ({ ...w }));
+  let thresholds = { ...DEFAULT_THRESHOLDS };
+
+  // ── AUTH ────────────────────────────────────────────────────────────────────
+
+  function unlock() {
+    const val = document.getElementById('pw-input').value;
+    const input = document.getElementById('pw-input');
+    const errEl = document.getElementById('lock-error');
+    if (val === PASSWORD) {
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('main-screen').style.display = 'block';
+      renderWeights();
+    } else {
+      input.classList.add('error');
+      errEl.style.display = 'block';
+      setTimeout(() => {
+        input.classList.remove('error');
+        input.value = '';
+        input.focus();
+      }, 900);
+    }
+  }
+
+  function togglePW() {
+    const input = document.getElementById('pw-input');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  // ── RENDER WEIGHTS ──────────────────────────────────────────────────────────
+
+  function renderWeights() {
+    const container = document.getElementById('weights-container');
+    container.innerHTML = weights.map((w, i) => {
+      const c = SIGNAL_COLORS[i];
+      const pct = Math.round(w.value);
+      return `
+        <div class="weight-row" id="row-${w.key}">
+          <div class="weight-header">
+            <div class="weight-meta">
+              <div class="weight-name">${w.label}</div>
+              <div class="weight-desc">${w.description}</div>
+            </div>
+            <div class="weight-right">
+              <div class="weight-val" id="val-${w.key}">${w.value}</div>
+              <div class="weight-pct" id="pct-${w.key}"
+                style="background:${c.bg};color:${c.text};">${pct}%</div>
+            </div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" min="0" max="50" step="1" value="${w.value}"
+              oninput="updateWeight('${w.key}', parseInt(this.value))" />
+          </div>
+        </div>`;
+    }).join('');
+    updateTotal();
+  }
+
+  function updateWeight(key, val) {
+    const w = weights.find(w => w.key === key);
+    if (!w) return;
+    w.value = val;
+    const i = weights.indexOf(w);
+    const c = SIGNAL_COLORS[i];
+    document.getElementById('val-' + key).textContent = val;
+    document.getElementById('pct-' + key).textContent = Math.round(val) + '%';
+    document.getElementById('pct-' + key).style.background = c.bg;
+    document.getElementById('pct-' + key).style.color = c.text;
+    updateTotal();
+    if (previewOpen) refreshPreview();
+  }
+
+  function updateTotal() {
+    const total = weights.reduce((s, w) => s + w.value, 0);
+    const numEl = document.getElementById('total-number');
+    const statusEl = document.getElementById('total-status');
+    const hintEl = document.getElementById('total-hint');
+    const btnExport = document.getElementById('btn-export');
+
+    numEl.textContent = total;
+    if (total === 100) {
+      numEl.className = 'total-number valid';
+      statusEl.className = 'total-status valid';
+      statusEl.textContent = 'Valid ✓';
+      hintEl.textContent = 'All weights sum to 100 — ready to export';
+      btnExport.disabled = false;
+    } else {
+      numEl.className = 'total-number invalid';
+      statusEl.className = 'total-status invalid';
+      const diff = total - 100;
+      statusEl.textContent = diff > 0 ? `+${diff} over` : `${diff} short`;
+      hintEl.textContent = diff > 0
+        ? `Reduce weights by ${diff} to reach 100`
+        : `Add ${Math.abs(diff)} more to reach 100`;
+      btnExport.disabled = true;
+    }
+  }
+
+  // ── THRESHOLDS ──────────────────────────────────────────────────────────────
+
+  function updateThresh(key, val) {
+    thresholds[key] = parseInt(val);
+    document.getElementById('thresh-' + key + '-val').textContent = val;
+    if (previewOpen) refreshPreview();
+  }
+
+  // ── CONFIG BUILD ────────────────────────────────────────────────────────────
+
+  function buildConfig() {
+    const w = {};
+    weights.forEach(item => { w[item.key] = item.value; });
+    return {
+      weights: w,
+      thresholds: {
+        wordCountMin:   thresholds.min,
+        wordCountIdeal: thresholds.ideal,
+        wordCountMax:   thresholds.max
+      }
+    };
+  }
+
+  function buildConfigString() {
+    const config = buildConfig();
+    return `const D3_CONFIG = ${JSON.stringify(config, null, 2)};`;
+  }
+
+  // ── ACTIONS ─────────────────────────────────────────────────────────────────
+
+  function exportConfig() {
+    const str = buildConfigString();
+    navigator.clipboard.writeText(str).then(() => {
+      const el = document.getElementById('copy-confirm');
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 2500);
+    });
+  }
+
+  function togglePreview() {
+    previewOpen = !previewOpen;
+    const panel = document.getElementById('output-panel');
+    if (previewOpen) {
+      panel.style.display = 'block';
+      refreshPreview();
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function refreshPreview() {
+    document.getElementById('output-code').textContent = buildConfigString();
+  }
+
+  function copyFromPanel() {
+    navigator.clipboard.writeText(buildConfigString()).then(() => {
+      const el = document.getElementById('copy-confirm');
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 2500);
+    });
+  }
+
+  function resetDefaults() {
+    weights = DEFAULTS.map(w => ({ ...w }));
+    thresholds = { ...DEFAULT_THRESHOLDS };
+    document.getElementById('thresh-min').value = thresholds.min;
+    document.getElementById('thresh-min-val').textContent = thresholds.min;
+    document.getElementById('thresh-ideal').value = thresholds.ideal;
+    document.getElementById('thresh-ideal-val').textContent = thresholds.ideal;
+    document.getElementById('thresh-max').value = thresholds.max;
+    document.getElementById('thresh-max-val').textContent = thresholds.max;
+    renderWeights();
+    if (previewOpen) refreshPreview();
+  }
+</script>
+</body>
+</html>
