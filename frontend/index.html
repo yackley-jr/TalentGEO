@@ -123,6 +123,10 @@
     letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--ink2); margin-bottom: 7px;
   }
+  .form-row .label-hint {
+    font-size: 11px; color: var(--ink3); font-weight: 400;
+    text-transform: none; letter-spacing: 0; margin-left: 6px;
+  }
   .form-row input, .form-row select, .form-row textarea {
     width: 100%; background: var(--surface);
     border: 1px solid var(--surface3); border-radius: 8px;
@@ -134,6 +138,47 @@
   }
   .form-row textarea { resize: vertical; min-height: 80px; }
   .form-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* URL FIELDS SECTION */
+  .url-section {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 20px;
+    border: 1px solid var(--surface3);
+  }
+  .url-section-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px;
+  }
+  .url-section-title {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink2);
+  }
+  .url-section-badge {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 10px;
+    background: var(--blue-lt); color: var(--blue);
+  }
+  .url-section p {
+    font-size: 12px; color: var(--ink3); margin-bottom: 16px; line-height: 1.6;
+  }
+  .url-field { margin-bottom: 12px; }
+  .url-field:last-child { margin-bottom: 0; }
+  .url-field label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--ink2); margin-bottom: 6px;
+  }
+  .url-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .url-field input {
+    width: 100%; background: #fff;
+    border: 1px solid var(--surface3); border-radius: 8px;
+    padding: 10px 14px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; color: var(--ink); outline: none; transition: border-color 0.15s;
+  }
+  .url-field input:focus { border-color: var(--gold); }
+  .url-field input::placeholder { color: var(--ink3); }
 
   .error-msg {
     background: var(--red-lt); color: var(--red);
@@ -227,6 +272,16 @@
   .score-bar-wrap { width: 200px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 6px; }
   .score-bar-fill { height: 100%; border-radius: 3px; background: var(--gold); transition: width 1.2s ease; }
   .score-grade { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+  /* DATA SOURCE BADGE */
+  .data-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 10px;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .data-badge.real { background: #eaf3de; color: #3b6d11; }
+  .data-badge.inferred { background: var(--amber-lt); color: var(--gold-dk); }
 
   .dim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
   .dim-card {
@@ -353,7 +408,7 @@
 <!-- SCREEN 1: INTAKE -->
 <div id="screen-intake" class="screen active">
   <div class="hero">
-    <div class="hero-eyebrow">AI GEO Audit · Powered by Cassillon Protocol</div>
+    <div class="hero-eyebrow">AI GEO Audit · Powered by The Cassillon Protocol</div>
     <h1>How does AI <em>see</em> your employer brand?</h1>
     <p>Get a full GEO visibility audit across five critical dimensions — schema integrity, career site hygiene, job content, brand signals, and distribution coverage.</p>
 
@@ -377,6 +432,7 @@
         <label>Company Domain *</label>
         <input type="text" id="input-domain" placeholder="e.g. careers.acme.com or acme.com" />
       </div>
+
       <div class="form-two">
         <div class="form-row">
           <label>Brand / Company Name *</label>
@@ -396,6 +452,40 @@
           </select>
         </div>
       </div>
+
+      <!-- JOB POSTING URLS -->
+      <div class="url-section">
+        <div class="url-section-header">
+          <div class="url-section-title">Job Posting URLs</div>
+          <div class="url-section-badge">D1 · D3 Audit Corpus</div>
+        </div>
+        <p>Provide up to three live job posting URLs for schema and content analysis. Include a mix of role types for the most accurate audit.</p>
+        <div class="url-field">
+          <label>
+            <span class="url-dot" style="background:#185fa5"></span>
+            Standard Role URL
+            <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— e.g. an engineering or ops role</span>
+          </label>
+          <input type="url" id="url-1" placeholder="https://careers.acme.com/jobs/12345-senior-engineer" />
+        </div>
+        <div class="url-field">
+          <label>
+            <span class="url-dot" style="background:#0f6e56"></span>
+            Remote Role URL
+            <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— optional</span>
+          </label>
+          <input type="url" id="url-2" placeholder="https://careers.acme.com/jobs/67890-remote-designer" />
+        </div>
+        <div class="url-field">
+          <label>
+            <span class="url-dot" style="background:#b8860b"></span>
+            Recently Closed Role URL
+            <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— optional</span>
+          </label>
+          <input type="url" id="url-3" placeholder="https://careers.acme.com/jobs/11111-product-manager" />
+        </div>
+      </div>
+
       <div class="form-two">
         <div class="form-row">
           <label>Your Name</label>
@@ -406,8 +496,9 @@
           <input type="email" id="input-email" placeholder="jane@company.com" />
         </div>
       </div>
+
       <div class="form-row">
-        <label>Context (optional)</label>
+        <label>Context <span class="label-hint">optional</span></label>
         <textarea id="input-context" placeholder="Any context about your hiring challenges, key roles, or current recruiting initiatives..."></textarea>
       </div>
 
@@ -437,11 +528,11 @@
     <div class="audit-steps">
       <div class="audit-step" id="step-0">
         <div class="step-icon" id="step-icon-0">1</div>
-        <div><div class="step-label">Schema &amp; Structured Data</div><div class="step-desc">Scanning JobPosting markup, structured data validity</div></div>
+        <div><div class="step-label">Schema &amp; Structured Data</div><div class="step-desc">Fetching job posting URLs, parsing JSON-LD schema</div></div>
       </div>
       <div class="audit-step" id="step-1">
         <div class="step-icon" id="step-icon-1">2</div>
-        <div><div class="step-label">Career Site Crawlability</div><div class="step-desc">Canonical structure, robots.txt, URL integrity</div></div>
+        <div><div class="step-label">Career Site Crawlability</div><div class="step-desc">Reading robots.txt, sitemap.xml, URL structure</div></div>
       </div>
       <div class="audit-step" id="step-2">
         <div class="step-icon" id="step-icon-2">3</div>
@@ -523,11 +614,7 @@
 </div>
 
 <script>
-  // ─── CONFIG ────────────────────────────────────────────────────────────────
-  // Replace this with your Cloud Run service URL after deploying the backend.
-  // Example: 'https://talentgeo-backend-abc123-uc.a.run.app'
-  const BACKEND_URL = 'REPLACE_WITH_YOUR_CLOUD_RUN_URL';
-  // ───────────────────────────────────────────────────────────────────────────
+  const BACKEND_URL = 'https://talentgeo-backend-360027703478.us-central1.run.app';
 
   let selectedTier = 'report';
   let formData = {};
@@ -560,10 +647,12 @@
     const brand = document.getElementById('input-brand').value.trim();
     if (!domain) { showError('Please enter a company domain to audit.'); return; }
     if (!brand) { showError('Please enter the brand or company name.'); return; }
-    if (BACKEND_URL === 'REPLACE_WITH_YOUR_CLOUD_RUN_URL') {
-      showError('Backend URL not configured. Set BACKEND_URL in index.html before deploying.');
-      return;
-    }
+
+    const jobUrls = [
+      document.getElementById('url-1').value.trim(),
+      document.getElementById('url-2').value.trim(),
+      document.getElementById('url-3').value.trim()
+    ].filter(u => u.length > 0);
 
     formData = {
       domain, brand,
@@ -571,27 +660,22 @@
       name: document.getElementById('input-name').value.trim(),
       email: document.getElementById('input-email').value.trim(),
       context: document.getElementById('input-context').value.trim(),
-      tier: selectedTier
+      tier: selectedTier,
+      jobUrls
     };
 
-    document.getElementById('loading-domain-label').innerHTML = `Analyzing <strong>${domain}</strong>`;
+    document.getElementById('loading-domain-label').innerHTML =
+      `Analyzing <strong>${domain}</strong>${jobUrls.length > 0 ? ` · ${jobUrls.length} job URL${jobUrls.length > 1 ? 's' : ''} provided` : ''}`;
     show('screen-loading');
     runAuditFlow();
   }
 
   async function runAuditFlow() {
     const steps = document.querySelectorAll('.audit-step');
-
-    // Animate steps 0-4 while API call is in flight
     const apiPromise = callBackend();
     const animPromise = animateSteps(steps, 0, 4);
-
-    // Wait for both animation (first 5 steps) and API response
     const [_, report] = await Promise.all([animPromise, apiPromise]);
-
-    // Final synthesis step
     await activateStep(steps[5], 'step-icon-5', 1800);
-
     if (report) {
       renderReport(report);
     } else {
@@ -630,7 +714,8 @@
           domain: formData.domain,
           brand: formData.brand,
           industry: formData.industry,
-          context: formData.context
+          context: formData.context,
+          jobUrls: formData.jobUrls
         })
       });
       if (!res.ok) return null;
@@ -679,10 +764,13 @@
 
     document.getElementById('dim-grid').innerHTML = d.dimensions.map(dim => {
       const c = colorMap[dim.colorClass] || colorMap.blue;
+      const badge = dim.dataSource === 'real'
+        ? '<span class="data-badge real">● Live Data</span>'
+        : '<span class="data-badge inferred">◌ Inferred</span>';
       return `<div class="dim-card">
         <div class="dim-card-header">
           <div>
-            <div class="dim-label" style="background:${c.bg};color:${c.text}">${dim.id}</div>
+            <div class="dim-label" style="background:${c.bg};color:${c.text}">${dim.id} ${badge}</div>
             <h3>${dim.name}</h3>
           </div>
           <div class="dim-score-circle" style="background:${c.bg};color:${c.text}">${dim.score}</div>
@@ -726,7 +814,7 @@
   }
 
   function resetApp() {
-    ['input-domain','input-brand','input-name','input-email','input-context'].forEach(id => {
+    ['input-domain','input-brand','input-name','input-email','input-context','url-1','url-2','url-3'].forEach(id => {
       document.getElementById(id).value = '';
     });
     document.getElementById('input-industry').value = '';
@@ -741,7 +829,7 @@
     alert('PDF generation coming soon. Your report will be emailed once this feature is enabled.');
   }
 
-  // ─── FALLBACK REPORT (used if backend is unreachable) ─────────────────────
+  // ─── FALLBACK REPORT ──────────────────────────────────────────────────────
   function getFallbackReport() {
     return {
       overallScore: 38,
@@ -763,27 +851,27 @@
           { platform: 'Schema.org JobPosting', status: 'fail' },
           { platform: 'Bing Career Search', status: 'na' }
         ],
-        narrative: `${formData.brand} has a fragmented GEO presence. LinkedIn is the strongest signal source, but the career site lacks machine-readable structured data that LLMs use for entity triangulation. Job descriptions are indexed but not optimized for AI retrieval — they lack compensation signals, answer-first formatting, and conversational framing.`
+        narrative: `${formData.brand} has a fragmented GEO presence. The audit could not reach the backend — this is a fallback report. Please try again or contact Cassillon if the issue persists.`
       },
       dimensions: [
-        { id:'D1', name:'Schema Integrity', score:22, colorClass:'blue', findings:['JobPosting schema absent from majority of listings','Missing critical fields: baseSalary, employmentType, jobLocation','Validation errors detected in existing structured data markup'] },
-        { id:'D2', name:'Career Site Hygiene', score:45, colorClass:'teal', findings:['Canonical URLs present but inconsistently applied','robots.txt may be blocking AI crawlers from key job pages','Page speed metrics below recommended thresholds for indexing priority'] },
-        { id:'D3', name:'Job Posting Content', score:31, colorClass:'amber', findings:['Job descriptions are requirement-heavy, not answer-first','Compensation data absent in 94% of postings','Descriptions lack conversational structure LLMs cite preferentially'] },
-        { id:'D4', name:'Employer Brand Signals', score:52, colorClass:'purple', findings:['LinkedIn company page is active and reasonably authoritative','Glassdoor rating present but sparse review volume limits LLM confidence','Entity inconsistency between domain, social profiles, and job boards'] },
-        { id:'D5', name:'Distribution Coverage', score:38, colorClass:'red', findings:['ATS-to-Google for Jobs feed has a 2-3 day refresh lag','Jobs not reaching several LLM-preferred aggregators','No LLM citation monitoring in place'] }
+        { id:'D1', name:'Schema Integrity', score:22, colorClass:'blue', dataSource:'inferred', findings:['Backend unreachable — schema data unavailable','Re-run the audit to get live schema findings','Contact Cassillon if the problem persists'] },
+        { id:'D2', name:'Career Site Hygiene', score:45, colorClass:'teal', dataSource:'inferred', findings:['Backend unreachable — crawlability data unavailable','robots.txt and sitemap could not be checked','Re-run the audit to get live findings'] },
+        { id:'D3', name:'Job Posting Content', score:31, colorClass:'amber', dataSource:'inferred', findings:['Job posting URLs could not be fetched','Content analysis unavailable','Re-run the audit with job posting URLs provided'] },
+        { id:'D4', name:'Employer Brand Signals', score:52, colorClass:'purple', dataSource:'inferred', findings:['Employer brand signals could not be retrieved','Re-run the audit to get live findings','Contact Cassillon for a manual audit'] },
+        { id:'D5', name:'Distribution Coverage', score:38, colorClass:'red', dataSource:'inferred', findings:['Distribution data unavailable','Re-run the audit to check Google for Jobs presence','Contact Cassillon for a manual audit'] }
       ],
       internalActions: [
-        { title:'Implement JobPosting Schema on all listings', description:'Add Schema.org JobPosting structured data to every job description page. Prioritize: title, description, datePosted, baseSalary, employmentType, and hiringOrganization.', effort:'Medium', impact:'High', dimension:'D1' },
-        { title:'Rewrite top 10 JDs in answer-first format', description:'Restructure your highest-volume job descriptions to lead with what candidates most want to know: role purpose, compensation range, team context, then requirements.', effort:'Low', impact:'High', dimension:'D3' },
-        { title:'Add salary ranges to all new postings', description:'Include explicit compensation ranges in every job description. This is the single highest-signal change for LLM retrieval and candidate conversion.', effort:'Low', impact:'High', dimension:'D3' },
-        { title:'Audit and fix ATS feed delivery', description:'Review your ATS Google for Jobs XML feed. Ensure daily refresh, correct structured fields, and no crawl-blocking issues. Test with Google\'s Rich Results Test.', effort:'Medium', impact:'High', dimension:'D5' },
-        { title:'Standardize brand entity across platforms', description:'Ensure company name, logo, description, and location data is identical across Glassdoor, LinkedIn, Indeed, and your career site.', effort:'Low', impact:'Medium', dimension:'D4' }
+        { title:'Re-run the audit', description:'The backend was unreachable. Try again — if the problem persists, contact Cassillon.', effort:'Low', impact:'High', dimension:'D1' },
+        { title:'Implement JobPosting Schema', description:'Add Schema.org JobPosting structured data to every job description page.', effort:'Medium', impact:'High', dimension:'D1' },
+        { title:'Add salary ranges to all postings', description:'Include explicit compensation ranges in every job description.', effort:'Low', impact:'High', dimension:'D3' },
+        { title:'Audit robots.txt for crawler blocking', description:'Check that your career site is not blocking AI crawlers via robots.txt.', effort:'Low', impact:'High', dimension:'D2' },
+        { title:'Standardize brand entity across platforms', description:'Ensure company name and description is identical across Glassdoor, LinkedIn, and Indeed.', effort:'Low', impact:'Medium', dimension:'D4' }
       ],
       cassillonActions: [
-        { title:'Full Schema Implementation Sprint', description:'Cassillon will audit, write, and deploy complete JobPosting structured data across your entire career site including advanced fields like jobBenefits and experienceRequirements.', effort:'Medium', impact:'High' },
-        { title:'GEO Content Rewrite Program', description:'Our team will rewrite your top 25 job descriptions using the Cassillon GEO Content Framework — answer-first structure, compensation integration, LLM-optimized language patterns.', effort:'High', impact:'High' },
-        { title:'Distribution Architecture Build', description:'We\'ll implement a comprehensive distribution stack connecting your ATS to all LLM-authoritative sources, with real-time monitoring dashboards and citation tracking.', effort:'High', impact:'High' },
-        { title:'Ongoing GEO Monitoring Retainer', description:'Monthly GEO health reports, citation tracking across 6 major LLMs, and proactive alerts when your brand visibility drops below threshold.', effort:'Low', impact:'Medium' }
+        { title:'Full Schema Implementation Sprint', description:'Cassillon will audit, write, and deploy complete JobPosting structured data across your career site.', effort:'Medium', impact:'High' },
+        { title:'GEO Content Rewrite Program', description:'Rewrite your top job descriptions using the Cassillon GEO Content Framework.', effort:'High', impact:'High' },
+        { title:'Distribution Architecture Build', description:'Connect your ATS to all LLM-authoritative sources with real-time monitoring.', effort:'High', impact:'High' },
+        { title:'Ongoing GEO Monitoring Retainer', description:'Monthly GEO health reports and citation tracking across major LLMs.', effort:'Low', impact:'Medium' }
       ]
     };
   }
