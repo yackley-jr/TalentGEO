@@ -18,7 +18,7 @@ app.use(express.json());
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'Talent GEO Audit API v3' });
+  res.json({ status: 'ok', service: 'Talent GEO Audit API v4' });
 });
 
 // ─── OAUTH: STEP 1 — REDIRECT USER TO GOOGLE ─────────────────────────────────
@@ -315,6 +315,120 @@ function extractVisibleText(html) {
   return text.substring(0, 3000);
 }
 
+// ─── D3 SCORING CONFIG ────────────────────────────────────────────────────────
+// Edit weights here (must sum to 100) or use the /d3-config admin page.
+// Thresholds define what counts as too short, ideal, or too long.
+
+const D3_CONFIG = {
+  "weights": {
+    "compensation":    30,
+    "locationClarity": 15,
+    "employmentType":  10,
+    "wordCount":       10,
+    "answerFirst":     10,
+    "reqVsResp":       10,
+    "benefitsSignals":  8,
+    "readability":      7
+  },
+  "thresholds": {
+    "wordCountMin":   150,
+    "wordCountIdeal": 400,
+    "wordCountMax":   900
+  }
+};
+
+// ─── D3 SCORING FUNCTION ──────────────────────────────────────────────────────
+
+function scoreJobPostingContent(text) {
+  if (!text || text.trim().length === 0) {
+    return {
+      score: 0,
+      signals: {},
+      wordCount: 0,
+      note: 'No content available to score'
+    };
+  }
+
+  const lower = text.toLowerCase();
+  const w = D3_CONFIG.weights;
+  const t = D3_CONFIG.thresholds;
+  const signals = {};
+
+  // ── COMPENSATION TRANSPARENCY (both $ patterns and keywords) ──────────────
+  const hasDollarAmount = /\$[\d,]+(\s*(k|\/hr|\/hour|\/year|,000))?/i.test(text);
+  const hasCompKeyword  = /\b(salary|compensation|pay range|base pay|hourly rate|ote|on-target earnings|total compensation|annual pay|wage)\b/i.test(lower);
+  signals.compensation = hasDollarAmount || hasCompKeyword;
+
+  // ── LOCATION CLARITY ──────────────────────────────────────────────────────
+  const hasRemote   = /\b(remote|work from home|wfh|fully remote|remote-first)\b/i.test(lower);
+  const hasHybrid   = /\b(hybrid|flexible location|partially remote)\b/i.test(lower);
+  const hasOnsite   = /\b(on-?site|in-?office|in person|on location)\b/i.test(lower);
+  const hasCity     = /\b([A-Z][a-z]+,?\s+(CA|NY|TX|FL|WA|IL|GA|MA|CO|OR|OH|NC|VA|AZ|MN|NJ|DC|PA|MI|MD|UT|TN|MO|IN|WI)\b)/.test(text);
+  signals.locationClarity = hasRemote || hasHybrid || hasOnsite || hasCity;
+
+  // ── EMPLOYMENT TYPE ───────────────────────────────────────────────────────
+  signals.employmentType = /\b(full.?time|part.?time|contract|contractor|temporary|temp|freelance|permanent|ftc|w-?2|1099)\b/i.test(lower);
+
+  // ── WORD COUNT ────────────────────────────────────────────────────────────
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  let wordCountScore = 0;
+  if (wordCount >= t.wordCountMin && wordCount <= t.wordCountMax) {
+    wordCountScore = wordCount >= t.wordCountIdeal
+      ? 1
+      : (wordCount - t.wordCountMin) / (t.wordCountIdeal - t.wordCountMin);
+  } else if (wordCount > t.wordCountMax) {
+    // Penalize but don't zero out — too long is better than too short
+    wordCountScore = 0.5;
+  }
+  signals.wordCount = wordCountScore;
+
+  // ── ANSWER-FIRST STRUCTURE ────────────────────────────────────────────────
+  // Role summary or "about the role" should appear in first 30% of content
+  const firstThird = lower.substring(0, Math.floor(lower.length * 0.3));
+  signals.answerFirst = /\b(about (the |this )?(role|position|job|opportunity)|overview|summary|what you('ll| will) do|the role|position summary|job summary)\b/i.test(firstThird);
+
+  // ── REQUIREMENTS VS RESPONSIBILITIES ─────────────────────────────────────
+  const hasResp = /\b(responsibilities|what you('ll| will) do|your role|key duties|day.to.day|you will)\b/i.test(lower);
+  const hasReqs = /\b(requirements|qualifications|what we('re| are) looking for|must have|you (have|bring)|skills (needed|required)|minimum qualifications)\b/i.test(lower);
+  signals.reqVsResp = hasResp && hasReqs;
+
+  // ── BENEFITS SIGNALS ──────────────────────────────────────────────────────
+  signals.benefitsSignals = /\b(benefits|401k|pto|vacation|health insurance|dental|vision|equity|stock|rsu|bonus|parental leave|paid leave|unlimited pto|flexible hours|professional development|tuition|wellness)\b/i.test(lower);
+
+  // ── READABILITY ───────────────────────────────────────────────────────────
+  // Penalize wall-of-text (no bullets/line breaks) and extreme jargon density
+  const hasBulletStructure = (text.match(/\n/g) || []).length > 5;
+  const jargonCount = (lower.match(/\b(synergy|leverage|rockstar|ninja|guru|wizard|unicorn|thought leader|disruptive|paradigm|ecosystem|scalable solution)\b/gi) || []).length;
+  signals.readability = hasBulletStructure && jargonCount < 3;
+
+  // ── CALCULATE SCORE ───────────────────────────────────────────────────────
+  const score = Math.round(
+    (signals.compensation    ? w.compensation    : 0) +
+    (signals.locationClarity ? w.locationClarity : 0) +
+    (signals.employmentType  ? w.employmentType  : 0) +
+    (wordCountScore * w.wordCount) +
+    (signals.answerFirst     ? w.answerFirst     : 0) +
+    (signals.reqVsResp       ? w.reqVsResp       : 0) +
+    (signals.benefitsSignals ? w.benefitsSignals : 0) +
+    (signals.readability     ? w.readability     : 0)
+  );
+
+  return {
+    score,
+    signals: {
+      compensation:    { pass: signals.compensation,    weight: w.compensation,    label: 'Compensation transparency' },
+      locationClarity: { pass: signals.locationClarity, weight: w.locationClarity, label: 'Location clarity' },
+      employmentType:  { pass: signals.employmentType,  weight: w.employmentType,  label: 'Employment type' },
+      wordCount:       { pass: wordCountScore >= 0.75,  weight: w.wordCount,       label: 'Word count quality', wordCount },
+      answerFirst:     { pass: signals.answerFirst,     weight: w.answerFirst,     label: 'Answer-first structure' },
+      reqVsResp:       { pass: signals.reqVsResp,       weight: w.reqVsResp,       label: 'Requirements vs. responsibilities' },
+      benefitsSignals: { pass: signals.benefitsSignals, weight: w.benefitsSignals, label: 'Benefits signals' },
+      readability:     { pass: signals.readability,     weight: w.readability,     label: 'Readability' },
+    },
+    wordCount
+  };
+}
+
 function normalizeDomain(domain) {
   let d = domain.trim();
   if (!d.startsWith('http')) d = 'https://' + d;
@@ -418,6 +532,7 @@ app.post('/audit', async (req, res) => {
     const jobSchema = findJobPostingSchema(jsonldBlocks);
     const schemaAudit = auditJobPostingSchema(jobSchema);
     const contentPreview = extractVisibleText(result.html);
+    const d3Score = scoreJobPostingContent(contentPreview);
     return {
       url: urls[i],
       fetchSuccess: true,
@@ -425,6 +540,7 @@ app.post('/audit', async (req, res) => {
       hasJobPostingSchema: !!jobSchema,
       schemaAudit,
       contentPreview,
+      d3Score,
       allSchemaTypes: jsonldBlocks.filter(b => !b.parseError).map(b => b['@type'] || (b['@graph'] ? '@graph' : 'unknown'))
     };
   });
@@ -440,7 +556,23 @@ app.post('/audit', async (req, res) => {
 
   // ── CLAUDE PROMPT ─────────────────────────────────────────────────────────
 
-  const gscContext = gscData.connected && gscData.siteUrl
+  const d3ScoredPages = jobAudits.filter(j => j.fetchSuccess && j.d3Score);
+  const d3Context = d3ScoredPages.length > 0
+    ? `D3 STRUCTURED CONTENT SCORES AVAILABLE: ${d3ScoredPages.length} job page(s) were scored by the Cassillon D3 engine.
+${d3ScoredPages.map(j => {
+  const s = j.d3Score;
+  const gaps = Object.entries(s.signals).filter(([,v]) => !v.pass).map(([,v]) => v.label);
+  const passes = Object.entries(s.signals).filter(([,v]) => v.pass).map(([,v]) => v.label);
+  return `- ${j.url}
+  Score: ${s.score}/100 | Word count: ${s.wordCount}
+  Passing: ${passes.length > 0 ? passes.join(', ') : 'none'}
+  Failing: ${gaps.length > 0 ? gaps.join(', ') : 'none'}`;
+}).join('\n')}
+The D3 dimension score should be the average of these per-URL scores: ${Math.round(d3ScoredPages.reduce((sum, j) => sum + j.d3Score.score, 0) / d3ScoredPages.length)}/100.
+Reference specific signal failures in D3 findings. perUrlScores must reflect the actual scores above.`
+    : `D3 DATA: No job URLs provided or pages could not be fetched. Score D3 as inferred based on domain/brand knowledge only.`;
+
+
     ? `GSC DATA AVAILABLE: Real Google Search Console data has been pulled for ${gscData.siteUrl}.
 - Job pages found in GSC: ${gscData.jobPageSearchAnalytics?.rowCount ?? 0}
 - Total impressions (90 days): ${gscData.jobPageSearchAnalytics?.totalImpressions ?? 0}
@@ -455,6 +587,8 @@ You will receive REAL audit data collected from the client's actual career site,
 Do not invent findings. Base every score and finding on the real data provided.
 
 ${gscContext}
+
+${d3Context}
 
 Return ONLY valid JSON, no markdown, no preamble. Structure:
 {
@@ -501,8 +635,9 @@ Return ONLY valid JSON, no markdown, no preamble. Structure:
       "name": "Job Posting Content",
       "score": 0-100,
       "colorClass": "amber",
-      "findings": ["finding based on real content analysis", "finding 2", "finding 3"],
-      "dataSource": "${urls.length > 0 ? 'real' : 'inferred'}"
+      "findings": ["specific finding referencing the per-URL D3 scores and signal breakdowns", "finding 2", "finding 3"],
+      "dataSource": "${urls.length > 0 ? 'real' : 'inferred'}",
+      "perUrlScores": [{"url": "string", "score": 0-100, "topGaps": ["signal that failed"]}]
     },
     {
       "id": "D4",
@@ -578,5 +713,5 @@ ${JSON.stringify(realDataSummary, null, 2)}`;
 });
 
 app.listen(PORT, () => {
-  console.log(`Talent GEO backend v3 running on port ${PORT}`);
+  console.log(`Talent GEO backend v4 running on port ${PORT}`);
 });
