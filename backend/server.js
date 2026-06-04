@@ -573,6 +573,7 @@ Reference specific signal failures in D3 findings. perUrlScores must reflect the
     : `D3 DATA: No job URLs provided or pages could not be fetched. Score D3 as inferred based on domain/brand knowledge only.`;
 
 
+  const gscContext = gscData.connected && gscData.siteUrl
     ? `GSC DATA AVAILABLE: Real Google Search Console data has been pulled for ${gscData.siteUrl}.
 - Job pages found in GSC: ${(gscData.jobPageSearchAnalytics && gscData.jobPageSearchAnalytics.rowCount) || 0}
 - Total impressions (90 days): ${(gscData.jobPageSearchAnalytics && gscData.jobPageSearchAnalytics.totalImpressions) || 0}
