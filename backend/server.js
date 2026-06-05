@@ -183,10 +183,11 @@ async function fetchRedditSignals(brand) {
 
   try {
     // Search 1: broad Reddit-wide search for brand name
+    //Electronic-Bag4472 is a random username that was assigned by Reddit when a new account was create for this data fetching task. --JRY 6/5/2026
     const broadSearchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(brand)}&sort=relevance&limit=25&t=year`;
     const broadRes = await fetch(broadSearchUrl, {
       headers: {
-        'User-Agent': 'TalentGEO-Audit/1.0 (employer brand research tool; contact@cassillon.com)'
+        'User-Agent': 'web:com.cassillon.talentgeo:v1.0 (by /u/Electronic-Bag4472)'
       },
       timeout: 10000
     });
