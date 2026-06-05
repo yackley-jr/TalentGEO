@@ -452,6 +452,7 @@
   .data-badge.real { background: var(--teal-lt); color: var(--teal); }
   .data-badge.inferred { background: var(--surface2); color: var(--ink3); }
   .data-badge.gsc { background: var(--blue-lt); color: var(--blue); }
+  .data-badge.reddit { background: #ffeee6; color: #d4450c; }
 
   /* ACTION ITEMS */
   .action-item {
@@ -1007,6 +1008,7 @@
   function dataBadge(source) {
     if (!source || source === 'inferred') return '<span class="data-badge inferred">◌ Inferred</span>';
     if (source === 'gsc+real') return '<span class="data-badge gsc">● GSC + Live</span>';
+    if (source === 'reddit+real') return '<span class="data-badge reddit">● Reddit Live</span>';
     return '<span class="data-badge real">● Live Data</span>';
   }
 
