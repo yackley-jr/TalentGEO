@@ -155,9 +155,10 @@ function matchSiteToDomain(sites, domain) {
   });
 }
 
-// ─── D4: REDDIT PUBLIC API FETCHER ───────────────────────────────────────────
-// Uses Reddit's public JSON API — no credentials required for read-only access.
-// Searches for brand mentions across candidate-facing subreddits.
+// ─── D4: REDDIT RSS FETCHER ───────────────────────────────────────────────────
+// Uses Reddit's public RSS feeds — no credentials, no API approval required.
+// Reddit explicitly supports RSS as a no-auth access method.
+// We get post titles, subreddit, date, and URL — sufficient for sentiment scoring.
 
 const D4_SUBREDDITS = [
   'cscareerquestions',
@@ -170,6 +171,35 @@ const D4_SUBREDDITS = [
   'engineering'
 ];
 
+function parseRedditRSS(xml) {
+  // Extract <entry> blocks (Atom format Reddit uses)
+  const entries = [];
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi;
+  let match;
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const block = match[1];
+
+    // Title — strip CDATA if present
+    const titleMatch = block.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>') : '';
+
+    // Link href
+    const linkMatch = block.match(/<link[^>]+href=["']([^"']+)["']/i);
+    const url = linkMatch ? linkMatch[1] : '';
+
+    // Subreddit — extract from URL path (/r/subredditname/)
+    const subredditMatch = url.match(/reddit\.com\/r\/([^/]+)/i);
+    const subreddit = subredditMatch ? subredditMatch[1] : '';
+
+    // Date
+    const dateMatch = block.match(/<updated>([\s\S]*?)<\/updated>/i);
+    const created = dateMatch ? dateMatch[1].trim().split('T')[0] : null;
+
+    if (title) entries.push({ title, url, subreddit, created });
+  }
+  return entries;
+}
+
 async function fetchRedditSignals(brand) {
   const results = {
     success: false,
@@ -181,142 +211,102 @@ async function fetchRedditSignals(brand) {
     error: null
   };
 
+  const RSS_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (compatible; TalentGEO/1.0)',
+    'Accept': 'application/rss+xml, application/atom+xml, text/xml, */*'
+  };
+
   try {
-    // Search 1: broad Reddit-wide search for brand name
-    //Electronic-Bag4472 is a random username that was assigned by Reddit when a new account was create for this data fetching task. --JRY 6/5/2026
-    const broadSearchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(brand)}&sort=relevance&limit=25&t=year`;
-    const broadRes = await fetch(broadSearchUrl, {
-      headers: {
-        'User-Agent': 'web:com.cassillon.talentgeo:v1.0 (by /u/Electronic-Bag4472)'
-      },
-      timeout: 10000
-    });
+    // RSS Feed 1: broad Reddit search
+    const broadUrl = `https://www.reddit.com/search.rss?q=${encodeURIComponent(brand)}&sort=relevance&t=year&limit=25`;
+    const broadRes = await fetch(broadUrl, { headers: RSS_HEADERS, timeout: 10000 });
 
     if (!broadRes.ok) {
-      results.error = `Reddit API returned ${broadRes.status}`;
+      results.error = `Reddit RSS returned ${broadRes.status}`;
       return results;
     }
 
-    const broadData = await broadRes.json();
-    const broadPosts = (broadData.data && broadData.data.children) || [];
+    const broadXml = await broadRes.text();
+    const broadEntries = parseRedditRSS(broadXml);
 
-    // Search 2: targeted search in candidate subreddits
-    const targetedSearchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(brand + ' company')}&sort=relevance&limit=15&t=year&restrict_sr=false`;
-    let targetedPosts = [];
+    // RSS Feed 2: brand + employer/company search for candidate context
+    let targetedEntries = [];
     try {
-      const targetedRes = await fetch(targetedSearchUrl, {
-        headers: {
-          'User-Agent': 'web:com.cassillon.talentgeo:v1.0 (by /u/Electronic-Bag4472)'
-        },
-        timeout: 8000
-      });
+      const targetedUrl = `https://www.reddit.com/search.rss?q=${encodeURIComponent(brand + ' employer')}&sort=relevance&t=year&limit=15`;
+      const targetedRes = await fetch(targetedUrl, { headers: RSS_HEADERS, timeout: 8000 });
       if (targetedRes.ok) {
-        const targetedData = await targetedRes.json();
-        targetedPosts = (targetedData.data && targetedData.data.children) || [];
+        const targetedXml = await targetedRes.text();
+        targetedEntries = parseRedditRSS(targetedXml);
       }
     } catch (e) {
-      // Non-fatal — broad search results are enough
+      // Non-fatal — broad results are sufficient
     }
 
-    // Merge and deduplicate by post ID
-    const allPosts = [...broadPosts, ...targetedPosts];
+    // Deduplicate by URL
     const seen = new Set();
-    const uniquePosts = allPosts.filter(p => {
-      if (!p.data || seen.has(p.data.id)) return false;
-      seen.add(p.data.id);
+    const allEntries = [...broadEntries, ...targetedEntries].filter(e => {
+      if (!e.url || seen.has(e.url)) return false;
+      seen.add(e.url);
       return true;
     });
 
-    if (uniquePosts.length === 0) {
+    if (allEntries.length === 0) {
       results.success = true;
       results.totalMentions = 0;
       results.note = 'No Reddit mentions found — brand may be too new, niche, or not discussed publicly.';
       return results;
     }
 
-    // Score each post for sentiment signals
+    // Sentiment keyword detection on title text
     const positiveKeywords = /\b(great|excellent|amazing|love|fantastic|awesome|recommend|best|positive|impressed|helpful|transparent|fair|good culture|good pay|benefits|growth|collaborative|innovative|supportive|exciting|opportunity|strong|solid|reputable|trusted)\b/i;
     const negativeKeywords = /\b(avoid|terrible|awful|worst|toxic|nightmare|scam|run away|layoffs|underpaid|overworked|micromanage|poor management|bad culture|no work.?life|burnout|red flag|ghost|ghosted|recruiter issues|bait and switch|misleading|shady|hostile|chaotic|disorganized|low pay|underpay)\b/i;
 
-    const processedPosts = uniquePosts.map(p => {
-      const post = p.data;
-      const combinedText = `${post.title || ''} ${post.selftext || ''}`.toLowerCase();
-      const isPositive = positiveKeywords.test(combinedText);
-      const isNegative = negativeKeywords.test(combinedText);
+    const processedEntries = allEntries.map(e => {
+      const text = e.title.toLowerCase();
+      const isPositive = positiveKeywords.test(text);
+      const isNegative = negativeKeywords.test(text);
 
       let sentiment = 'neutral';
       if (isPositive && !isNegative) sentiment = 'positive';
       else if (isNegative && !isPositive) sentiment = 'negative';
       else if (isNegative && isPositive) sentiment = 'mixed';
 
-      return {
-        id: post.id,
-        title: (post.title || '').substring(0, 120),
-        subreddit: post.subreddit,
-        score: post.score || 0,
-        numComments: post.num_comments || 0,
-        sentiment,
-        created: post.created_utc ? new Date(post.created_utc * 1000).toISOString().split('T')[0] : null,
-        url: post.permalink ? `https://reddit.com${post.permalink}` : null
-      };
+      return { ...e, title: e.title.substring(0, 120), sentiment };
     });
 
-    // Filter to posts that are actually about the brand (title or text contains brand name)
+    // Prioritize posts that mention the brand by name or are from candidate subreddits
     const brandLower = brand.toLowerCase();
-    const relevantPosts = processedPosts.filter(p =>
-      p.title.toLowerCase().includes(brandLower) ||
-      (p.subreddit && D4_SUBREDDITS.includes(p.subreddit.toLowerCase()))
+    const relevantEntries = processedEntries.filter(e =>
+      e.title.toLowerCase().includes(brandLower) ||
+      D4_SUBREDDITS.includes((e.subreddit || '').toLowerCase())
     );
 
-    // Use relevant posts if we have them, otherwise all posts
-    const finalPosts = relevantPosts.length >= 3 ? relevantPosts : processedPosts.slice(0, 20);
+    const finalEntries = relevantEntries.length >= 3 ? relevantEntries : processedEntries.slice(0, 20);
 
     // Tally sentiment
-    finalPosts.forEach(p => {
-      if (p.sentiment === 'positive') results.sentimentBreakdown.positive++;
-      else if (p.sentiment === 'negative') results.sentimentBreakdown.negative++;
+    finalEntries.forEach(e => {
+      if (e.sentiment === 'positive') results.sentimentBreakdown.positive++;
+      else if (e.sentiment === 'negative') results.sentimentBreakdown.negative++;
       else results.sentimentBreakdown.neutral++;
     });
 
-    // Unique subreddits found
-    results.subredditsFound = [...new Set(finalPosts.map(p => p.subreddit).filter(Boolean))];
-
-    // Top 8 posts by score for the prompt
-    results.posts = finalPosts
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
-
-    results.totalMentions = finalPosts.length;
+    results.subredditsFound = [...new Set(finalEntries.map(e => e.subreddit).filter(Boolean))];
+    results.posts = finalEntries.slice(0, 8); // top 8 for Claude prompt
+    results.totalMentions = finalEntries.length;
     results.success = true;
 
-    // Build top signals summary for Claude
-    const negPosts = finalPosts.filter(p => p.sentiment === 'negative').sort((a, b) => b.score - a.score);
-    const posPosts = finalPosts.filter(p => p.sentiment === 'positive').sort((a, b) => b.score - a.score);
+    // Build signal summaries for Claude
+    const negPosts = finalEntries.filter(e => e.sentiment === 'negative');
+    const posPosts = finalEntries.filter(e => e.sentiment === 'positive');
 
-    if (negPosts.length > 0) {
-      results.topSignals.push({
-        type: 'negative',
-        count: negPosts.length,
-        topPost: negPosts[0].title
-      });
-    }
-    if (posPosts.length > 0) {
-      results.topSignals.push({
-        type: 'positive',
-        count: posPosts.length,
-        topPost: posPosts[0].title
-      });
-    }
+    if (negPosts.length > 0) results.topSignals.push({ type: 'negative', count: negPosts.length, topPost: negPosts[0].title });
+    if (posPosts.length > 0) results.topSignals.push({ type: 'positive', count: posPosts.length, topPost: posPosts[0].title });
 
-    // Candidate subreddit presence check
-    const candidateSubreddits = finalPosts
-      .filter(p => D4_SUBREDDITS.includes((p.subreddit || '').toLowerCase()))
-      .map(p => p.subreddit);
+    const candidateSubreddits = finalEntries
+      .filter(e => D4_SUBREDDITS.includes((e.subreddit || '').toLowerCase()))
+      .map(e => e.subreddit);
     if (candidateSubreddits.length > 0) {
-      results.topSignals.push({
-        type: 'candidate_subreddit_presence',
-        subreddits: [...new Set(candidateSubreddits)]
-      });
+      results.topSignals.push({ type: 'candidate_subreddit_presence', subreddits: [...new Set(candidateSubreddits)] });
     }
 
   } catch (e) {
