@@ -206,7 +206,7 @@ async function fetchRedditSignals(brand) {
     try {
       const targetedRes = await fetch(targetedSearchUrl, {
         headers: {
-          'User-Agent': 'TalentGEO-Audit/1.0 (employer brand research tool; contact@cassillon.com)'
+          'User-Agent': 'web:com.cassillon.talentgeo:v1.0 (by /u/Electronic-Bag4472)'
         },
         timeout: 8000
       });
