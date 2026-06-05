@@ -691,18 +691,18 @@
       </div>
       <p class="ats-desc">Select your ATS to check your public job feed for D5 distribution coverage.</p>
       <div class="ats-grid" id="ats-grid">
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="greenhouse"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Greenhouse</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="lever"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Lever</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="workday"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Workday</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="icims"><div class="ats-checkmark">✓</div><span class="ats-chip-name">iCIMS</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="ashby"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Ashby</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="taleo"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Taleo</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="smartrecruiters"><div class="ats-checkmark">✓</div><span class="ats-chip-name">SmartRecruit.</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="rippling"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Rippling</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="bamboohr"><div class="ats-checkmark">✓</div><span class="ats-chip-name">BambooHR</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="jazzhr"><div class="ats-checkmark">✓</div><span class="ats-chip-name">JazzHR</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="jobvite"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Jobvite</span></label>
-        <label class="ats-chip" onclick="toggleATS(this)"><input type="checkbox" value="other"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Other</span></label>
+        <label class="ats-chip"><input type="checkbox" value="greenhouse"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Greenhouse</span></label>
+        <label class="ats-chip"><input type="checkbox" value="lever"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Lever</span></label>
+        <label class="ats-chip"><input type="checkbox" value="workday"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Workday</span></label>
+        <label class="ats-chip"><input type="checkbox" value="icims"><div class="ats-checkmark">✓</div><span class="ats-chip-name">iCIMS</span></label>
+        <label class="ats-chip"><input type="checkbox" value="ashby"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Ashby</span></label>
+        <label class="ats-chip"><input type="checkbox" value="taleo"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Taleo</span></label>
+        <label class="ats-chip"><input type="checkbox" value="smartrecruiters"><div class="ats-checkmark">✓</div><span class="ats-chip-name">SmartRecruit.</span></label>
+        <label class="ats-chip"><input type="checkbox" value="rippling"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Rippling</span></label>
+        <label class="ats-chip"><input type="checkbox" value="bamboohr"><div class="ats-checkmark">✓</div><span class="ats-chip-name">BambooHR</span></label>
+        <label class="ats-chip"><input type="checkbox" value="jazzhr"><div class="ats-checkmark">✓</div><span class="ats-chip-name">JazzHR</span></label>
+        <label class="ats-chip"><input type="checkbox" value="jobvite"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Jobvite</span></label>
+        <label class="ats-chip"><input type="checkbox" value="other"><div class="ats-checkmark">✓</div><span class="ats-chip-name">Other</span></label>
       </div>
       <div class="ats-selected-note" id="ats-selected-note"></div>
     </div>
@@ -882,6 +882,15 @@
       note.classList.remove('visible');
     }
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.ats-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleATS(chip);
+      });
+    });
+  });
 
   function renderGSCState(connected) {
     const section = document.getElementById('gsc-section');
