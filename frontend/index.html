@@ -462,7 +462,7 @@
   .data-badge.real { background: var(--teal-lt); color: var(--teal); }
   .data-badge.inferred { background: var(--surface2); color: var(--ink3); }
   .data-badge.gsc { background: var(--blue-lt); color: var(--blue); }
-  .data-badge.reddit { background: #ffeee6; color: #d4450c; }
+  .data-badge.reddit { background: #2a1008; color: #f87060; }
 
   /* ATS SELECTOR */
   .ats-divider {
@@ -670,15 +670,15 @@
       <div class="url-field">
         <label>
           <span class="url-dot" style="background:#185fa5"></span>
-          Standard Role URL
-          <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— e.g. an engineering or ops role</span>
+          Job Description #1
+          <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— e.g. any active job posting</span>
         </label>
         <input type="url" id="url-1" placeholder="https://careers.acme.com/jobs/12345-senior-engineer" />
       </div>
       <div class="url-field">
         <label>
           <span class="url-dot" style="background:#0f6e56"></span>
-          Remote Role URL
+          Job Description #2
           <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— optional</span>
         </label>
         <input type="url" id="url-2" placeholder="https://careers.acme.com/jobs/67890-remote-designer" />
@@ -686,7 +686,7 @@
       <div class="url-field">
         <label>
           <span class="url-dot" style="background:var(--gold)"></span>
-          Recently Closed Role URL
+          Job Description #3
           <span style="color:var(--ink3);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;margin-left:4px;">— optional</span>
         </label>
         <input type="url" id="url-3" placeholder="https://careers.acme.com/jobs/11111-product-manager" />
@@ -1148,13 +1148,13 @@
 
     document.getElementById('geo-narrative').innerHTML = `<p>${d.geoProfile.narrative}</p>`;
 
-    const colorMap = {
-      blue:   { bg:'#e6f1fb', text:'#185fa5', bar:'#185fa5' },
-      teal:   { bg:'#e1f5ee', text:'#0f6e56', bar:'#0f6e56' },
-      amber:  { bg:'#faeeda', text:'#ba7517', bar:'#ba7517' },
-      purple: { bg:'#eeedfe', text:'#534ab7', bar:'#534ab7' },
-      red:    { bg:'#fcebeb', text:'#a32d2d', bar:'#a32d2d' }
-    };
+   const colorMap = {
+  blue:   { bg:'#0d1f3c', text:'#4a90d9', bar:'#4a90d9' },
+  teal:   { bg:'#0a2a20', text:'#2dd4a0', bar:'#2dd4a0' },
+  amber:  { bg:'#2a1f08', text:'#d97706', bar:'#d97706' },
+  purple: { bg:'#1a1640', text:'#9d97e8', bar:'#9d97e8' },
+  red:    { bg:'#2a0f0f', text:'#f87171', bar:'#f87171' }
+};
 
     document.getElementById('dim-grid').innerHTML = d.dimensions.map(dim => {
       const c = colorMap[dim.colorClass] || colorMap.blue;
