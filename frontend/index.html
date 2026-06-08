@@ -6,29 +6,34 @@
 <title>Talent GEO — Cassillon AI GEO Audit</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
- :root {
-  --ink: #0f0e0c;
-  --ink2: #3a3832;
-  --ink3: #7a7670;
-  --surface: #faf9f6;
-  --surface2: #f0ede6;
-  --surface3: #e4e0d8;
+:root {
+  /* TEXT */
+  --ink: #e0e8f5;        /* flipped: light text on dark */
+  --ink2: #a0b4d0;
+  --ink3: #5a7ab0;
+
+  /* BACKGROUNDS */
+  --surface: #0b1526;    /* page bg — deep navy */
+  --surface2: #0d1f3c;   /* card/section bg */
+  --surface3: #1e3a6e;   /* borders */
 
   /* BRONZE/GOLD — trim only, never status text */
-  --gold: #a0722a;        /* changed: cooler, darker bronze */
-  --gold-lt: #f0e6cc;     /* changed: matched to new gold */
-  --gold-dk: #7a5520;     /* changed: matched to new gold */
+  --gold: #a0722a;
+  --gold-lt: #1a2d50;    /* flipped: dark tinted bg instead of light */
+  --gold-dk: #c8a060;    /* flipped: lighter for text on dark bg */
 
   /* AMBER — "needs work" status only, never decorative */
-  --amber: #d97706;       /* changed: warmer yellow, clearly distinct from bronze */
-  --amber-lt: #fef3c7;    /* changed: matched to new amber */
+  --amber: #d97706;
+  --amber-lt: #2a1f08;   /* flipped: dark tinted bg */
 
-  --teal: #0f6e56;
-  --teal-lt: #e1f5ee;
-  --red: #a32d2d;
-  --red-lt: #fcebeb;
-  --blue: #185fa5;
-  --blue-lt: #e6f1fb;
+  /* SEMANTIC */
+  --teal: #2dd4a0;        /* brightened for dark bg */
+  --teal-lt: #0a2a20;    /* flipped: dark tinted bg */
+  --red: #f87171;         /* brightened for dark bg */
+  --red-lt: #2a0f0f;     /* flipped: dark tinted bg */
+  --blue: #4a90d9;        /* brightened for dark bg */
+  --blue-lt: #0d1f3c;    /* flipped: dark tinted bg */
+
   --radius: 10px;
   --radius-lg: 16px;
 }
@@ -145,7 +150,7 @@
     font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.15s;
   }
   .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
-    border-color: var(--gold); background: #fff;
+    border-color: var(--gold); background: var(--surface2);
   }
   .form-row textarea { resize: vertical; min-height: 80px; }
   .form-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -233,7 +238,7 @@
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
   }
   .url-field input {
-    width: 100%; background: #fff;
+    width: 100%; background: var(--surface2);
     border: 1px solid var(--surface3); border-radius: 8px;
     padding: 10px 14px; font-family: 'DM Sans', sans-serif;
     font-size: 13px; color: var(--ink); outline: none;
@@ -358,7 +363,7 @@
   }
   .score-grade { font-size: 16px; color: rgba(255,255,255,0.7); }
   .score-bar-track {
-    height: 6px; background: rgba(255,255,255,0.15);
+    height: 6px; background: rgba(255,255,255,0.1);
     border-radius: 3px; overflow: hidden; margin-bottom: 12px;
   }
   .score-bar-fill {
@@ -368,8 +373,8 @@
   .score-key {
     display: flex; gap: 18px; flex-wrap: wrap;
   }
-  .score-key-item { font-size: 12px; color: rgba(255,255,255,0.5); }
-  .score-key-item strong { color: rgba(255,255,255,0.85); }
+  .score-key-item { font-size: 12px; color: rgba(255,255,255,0.4); }
+  .score-key-item strong { color: rgba(255,255,255,0.9); }
 
   .section-panel { margin-bottom: 2.5rem; }
   .section-panel h2 {
@@ -420,7 +425,7 @@
   }
   .dim-card {
     border: 1px solid var(--surface3); border-radius: var(--radius-lg);
-    padding: 20px; background: #fff;
+    padding: 20px; background: var(--surface2);
   }
   .dim-card-header {
     display: flex; align-items: flex-start;
@@ -538,7 +543,7 @@
   .tag-cassillon { background: var(--ink); color: var(--gold); }
 
   .cta-panel {
-    background: var(--gold-lt); border: 1px solid #e8d08a;
+    background: var(--gold-lt); border: 1px solid rgba(160,114,42,0.4);
     border-radius: var(--radius-lg); padding: 2rem;
     text-align: center; margin-bottom: 2rem;
   }
