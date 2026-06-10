@@ -18,7 +18,7 @@ app.use(express.json());
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'Talent GEO Audit API v5' });
+  res.json({ status: 'ok', service: 'Talent GEO Audit API v6' });
 });
 
 // ─── OAUTH: STEP 1 — REDIRECT USER TO GOOGLE ─────────────────────────────────
@@ -814,8 +814,8 @@ Suggested D4 score: 45/100 (neutral baseline — absence of negative signal is n
 Set D4 dataSource to "reddit+real" and note the absence of Reddit presence in findings.`;
 
   } else {
-    d4Context = `D4 DATA: Reddit fetch failed (${redditResult.error || 'unknown error'}). Score D4 as inferred based on brand/domain knowledge only.
-Set D4 dataSource to "inferred".`;
+    d4Context = `D4 DATA: Reddit fetch failed (${redditResult.error || 'unknown error'}). No employer brand signal data is available. Return findings: ["Insufficient Data"] and score 50.
+Set D4 dataSource to "insufficient".`;
   }
 
  const d5Context = (selectedATS && selectedATS.length > 0)
@@ -829,11 +829,55 @@ For the D5 dimension, provide specific, actionable optimization tips tailored to
 Reference each selected ATS by name in the D5 findings. Be specific — not generic distribution advice.`
     : `D5 CONTEXT: No ATS platform selected. Provide general distribution coverage advice for D5.`;
 
-  const systemPrompt = `You are the Cassillon AI GEO Audit Engine.
-You will receive REAL audit data collected from the client's actual career site, job posting URLs, Google Search Console, and Reddit.
+  // ── PER-DIMENSION DATA AVAILABILITY FLAGS ────────────────────────────────
+  // These are passed into the prompt so Claude knows exactly what data exists
+  // for each dimension and cannot fabricate signals it was never given.
 
-Do not invent findings. Base every score and finding on the real data provided.
+  const d1HasData = !!(jobAudits.some(j => j.fetchSuccess) || (gscData.connected && gscData.siteUrl));
+  const d2HasData = !!(robotsAudit.found || sitemapAudit.found || (gscData.connected && gscData.siteUrl));
+  const d3HasData = d3ScoredPages.length > 0;
+  const d4HasData = redditResult.success;
+  const d5HasData = !!(selectedATS && selectedATS.length > 0);
 
+  // Schema.org signal: only mark ok/fail if we actually fetched a job page with schema
+  const schemaSignalStatus = (() => {
+    if (!jobAudits.some(j => j.fetchSuccess)) return 'na';
+    const hasSchema = jobAudits.some(j => j.fetchSuccess && j.hasJobPostingSchema);
+    return hasSchema ? 'ok' : 'fail';
+  })();
+
+  const systemPrompt = `You are the Cassillon AI GEO Audit Engine. You apply the Cassillon GEO Optimization Protocol to score employer brand and job posting visibility across five dimensions (D1–D5).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL RULE — NO FABRICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You MUST NOT invent, assume, or hallucinate data for any dimension.
+
+For each dimension, you are told explicitly what real data was collected.
+- If real data exists → base ALL findings and scores on that data only.
+- If real data does NOT exist → set the findings array to ["Insufficient Data"] and assign a neutral score of 50. Do NOT generate plausible-sounding findings. Do NOT reference Reddit, LinkedIn, Glassdoor, Indeed, or any external platform unless that platform's data was explicitly provided to you below.
+
+The only data sources available to you are:
+1. robots.txt and sitemap.xml — fetched directly from the domain (D1, D2)
+2. JSON-LD schema extracted from job posting URLs provided by the user (D1, D3)
+3. Google Search Console data — ONLY if GSC is marked as connected below (D1, D2)
+4. Reddit RSS data — ONLY if Reddit fetch is marked as successful below (D4)
+5. ATS platform selection — ONLY if the user selected ATS platforms below (D5)
+
+You have NO access to LinkedIn, Glassdoor, Indeed, Bing, or any other external platform. Do not reference or score based on those platforms unless explicitly provided above.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATA AVAILABILITY PER DIMENSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+D1 (Schema Integrity):     ${d1HasData ? 'REAL DATA AVAILABLE — see schema and GSC context below' : 'NO DATA — return ["Insufficient Data"], score 50'}
+D2 (Career Site Hygiene):  ${d2HasData ? 'REAL DATA AVAILABLE — see robots.txt, sitemap, and GSC context below' : 'NO DATA — return ["Insufficient Data"], score 50'}
+D3 (Job Posting Content):  ${d3HasData ? 'REAL DATA AVAILABLE — see D3 scored pages below' : 'NO DATA — return ["Insufficient Data"], score 50'}
+D4 (Employer Brand):       ${d4HasData ? 'REAL DATA AVAILABLE — see Reddit context below' : 'NO DATA — return ["Insufficient Data"], score 50'}
+D5 (Distribution):         ${d5HasData ? 'REAL DATA AVAILABLE — see ATS context below' : 'NO DATA — return ["Insufficient Data"], score 50'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REAL DATA PROVIDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${gscContext}
 
 ${d3Context}
@@ -842,84 +886,90 @@ ${d4Context}
 
 ${d5Context}
 
-Return ONLY valid JSON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GEOPPROFILE METRICS AND SIGNALS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For geoProfile.metrics: derive values ONLY from real data above. If a metric has no data source, set its value to "Insufficient Data".
+For geoProfile.signals: set status to "na" for any platform you have no real data about. Only set "ok", "warn", or "fail" for:
+- "Schema.org JobPosting" — based on actual JSON-LD schema extracted (status: "${schemaSignalStatus}")
+- "Google for Jobs" — only if GSC data was provided
+Do NOT set ok/warn/fail for LinkedIn Jobs, Glassdoor, Indeed ATS Feed, or Bing Career Search — set all of those to "na".
+
+Return ONLY valid JSON — no markdown, no preamble:
 {
   "overallScore": 0-100,
   "scoreGrade": "Poor|Fair|Developing|Good|Strong|Excellent",
   "geoProfile": {
     "metrics": [
-      {"label": "AI Citation Rate", "value": "string"},
-      {"label": "LLM Visibility", "value": "string"},
-      {"label": "Structured Data Coverage", "value": "string"},
-      {"label": "Brand Entity Strength", "value": "string"},
-      {"label": "Distribution Index", "value": "string"},
-      {"label": "Content GEO Score", "value": "string"}
+      {"label": "AI Citation Rate", "value": "derived from real data or Insufficient Data"},
+      {"label": "LLM Visibility", "value": "derived from real data or Insufficient Data"},
+      {"label": "Structured Data Coverage", "value": "derived from real schema audit or Insufficient Data"},
+      {"label": "Brand Entity Strength", "value": "derived from real Reddit data or Insufficient Data"},
+      {"label": "Distribution Index", "value": "derived from real ATS data or Insufficient Data"},
+      {"label": "Content GEO Score", "value": "derived from real D3 scores or Insufficient Data"}
     ],
     "signals": [
-      {"platform": "Google for Jobs", "status": "ok|warn|fail|na"},
-      {"platform": "LinkedIn Jobs", "status": "ok|warn|fail|na"},
-      {"platform": "Glassdoor", "status": "ok|warn|fail|na"},
-      {"platform": "Indeed ATS Feed", "status": "ok|warn|fail|na"},
-      {"platform": "Schema.org JobPosting", "status": "ok|warn|fail|na"},
-      {"platform": "Bing Career Search", "status": "ok|warn|fail|na"}
+      {"platform": "Google for Jobs", "status": "${(gscData.connected && gscData.siteUrl) ? 'ok|warn|fail' : 'na'}"},
+      {"platform": "LinkedIn Jobs", "status": "na"},
+      {"platform": "Glassdoor", "status": "na"},
+      {"platform": "Indeed ATS Feed", "status": "na"},
+      {"platform": "Schema.org JobPosting", "status": "${schemaSignalStatus}"},
+      {"platform": "Bing Career Search", "status": "na"}
     ],
-    "narrative": "3-4 sentence GEO profile narrative based on the real audit data"
+    "narrative": "3-4 sentence narrative based ONLY on the real audit data provided. Do not reference platforms or signals not backed by data."
   },
   "dimensions": [
     {
       "id": "D1",
       "name": "Schema Integrity",
-      "score": 0-100,
+      "score": ${d1HasData ? '0-100 based on real schema data' : '50'},
       "colorClass": "blue",
-      "findings": ["specific finding referencing real schema and GSC data", "finding 2", "finding 3"],
-      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : 'real'}"
+      "findings": ${d1HasData ? '["finding from real schema/GSC data", "finding 2", "finding 3"]' : '["Insufficient Data"]'},
+      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : (d1HasData ? 'real' : 'insufficient')}"
     },
     {
       "id": "D2",
       "name": "Career Site Hygiene",
-      "score": 0-100,
+      "score": ${d2HasData ? '0-100 based on real robots.txt/sitemap data' : '50'},
       "colorClass": "teal",
-      "findings": ["specific finding referencing real robots.txt/sitemap and GSC coverage data", "finding 2", "finding 3"],
-      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : 'real'}"
+      "findings": ${d2HasData ? '["finding from real robots.txt/sitemap/GSC data", "finding 2", "finding 3"]' : '["Insufficient Data"]'},
+      "dataSource": "${gscData.connected && gscData.siteUrl ? 'gsc+real' : (d2HasData ? 'real' : 'insufficient')}"
     },
     {
       "id": "D3",
       "name": "Job Posting Content",
-      "score": 0-100,
+      "score": ${d3HasData ? '0-100 based on real D3 scored pages' : '50'},
       "colorClass": "amber",
-      "findings": ["specific finding referencing the per-URL D3 scores and signal breakdowns", "finding 2", "finding 3"],
-      "dataSource": "${urls.length > 0 ? 'real' : 'inferred'}",
-      "perUrlScores": [{"url": "string", "score": 0-100, "topGaps": ["signal that failed"]}]
+      "findings": ${d3HasData ? '["finding from real D3 signal scores", "finding 2", "finding 3"]' : '["Insufficient Data"]'},
+      "dataSource": "${d3HasData ? 'real' : 'insufficient'}",
+      "perUrlScores": ${d3HasData ? '[{"url": "string", "score": 0-100, "topGaps": ["signal name"]}]' : '[]'}
     },
     {
       "id": "D4",
       "name": "Employer Brand Signals",
-      "score": 0-100,
+      "score": ${d4HasData ? '0-100 based on real Reddit data' : '50'},
       "colorClass": "purple",
-      "findings": ["finding referencing real Reddit data — specific post titles, subreddits, or sentiment counts", "finding 2", "finding 3"],
-      "dataSource": "${redditResult.success ? 'reddit+real' : 'inferred'}"
+      "findings": ${d4HasData ? '["finding from real Reddit post titles/subreddits/sentiment", "finding 2", "finding 3"]' : '["Insufficient Data"]'},
+      "dataSource": "${d4HasData ? 'reddit+real' : 'insufficient'}"
     },
     {
       "id": "D5",
       "name": "Distribution Coverage",
-      "score": 0-100,
+      "score": ${d5HasData ? '0-100 based on real ATS data' : '50'},
       "colorClass": "red",
-      "findings": ["finding 1", "finding 2", "finding 3"],
-      "dataSource": "${selectedATS && selectedATS.length > 0 ? 'ats+tips' : 'inferred'}"
-    }
-  ],
+      "findings": ${d5HasData ? '["finding from real ATS platform data", "finding 2", "finding 3"]' : '["Insufficient Data"]'},
+      "dataSource": "${d5HasData ? 'ats+tips' : 'insufficient'}"
     }
   ],
   "internalActions": [
-    {"title": "action title", "description": "specific actionable step referencing real findings", "effort": "Low|Medium|High", "impact": "High|Medium", "dimension": "D1"}
+    {"title": "action title", "description": "specific actionable step referencing real findings — omit actions for dimensions with Insufficient Data", "effort": "Low|Medium|High", "impact": "High|Medium", "dimension": "D1"}
   ],
   "cassillonActions": [
     {"title": "service title", "description": "what Cassillon would deliver", "effort": "Low|Medium|High", "impact": "High|Medium"}
   ]
 }
 
-Provide exactly 5 internalActions and exactly 4 cassillonActions.
-Make all findings and actions specific to the real data — not generic.`;
+Provide exactly 5 internalActions and exactly 4 cassillonActions. Only reference real findings in actions — do not invent issues for dimensions that returned Insufficient Data.`;
 
   const userPrompt = `Audit this employer brand for GEO visibility.
 
@@ -967,5 +1017,5 @@ ${JSON.stringify(realDataSummary, null, 2)}`;
 });
 
 app.listen(PORT, () => {
-  console.log(`Talent GEO backend v5 running on port ${PORT}`);
+  console.log(`Talent GEO backend v6 running on port ${PORT}`);
 });
